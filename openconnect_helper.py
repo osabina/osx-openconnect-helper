@@ -82,9 +82,9 @@ class ProfileManager(object):
 
     def get_keychain_password(self, name, kind='openconnect'):
         c = Popen(['security', 'find-internet-password',
-               '-c', CREATOR, '-l', name, '-D', kind, '-w'],
-              stdout=PIPE,
-              stderr=devnull)
+                   '-c', CREATOR, '-l', name, '-D', kind, '-w'],
+                  stdout=PIPE,
+                  stderr=devnull)
         password = c.communicate()[0].rstrip('\r\n')
         if c.returncode == 0:
             return password
