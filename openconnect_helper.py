@@ -113,6 +113,15 @@ class ProfileManager(object):
     def get_rsa_token(self, name):
         return self.get_keychain_password(name, kind='openconnect-rsa')
 
+    def import_totp_seed(self, name, url, seed):
+        self.set_keychain_password(name, url, '', seed, kind='openconnect-totp')
+
+    def remove_totp_seed(self, name):
+        return self.remove_keychain_password(name, kind='openconnect-totp')
+
+    def get_totp_seed(self, name):
+        return "base32:{}".format(self.get_keychain_password(name, kind='openconnect-totp'))
+
     def set_profile(self, name, url, user, group=None, fingerprint=None):
         profiles = self.config.setdefault('profiles', [])
         for idx, profile in enumerate(profiles):
@@ -132,12 +141,16 @@ class ProfileManager(object):
 
     def get_stored_profile_auth(self, name):
         kinds = (('openconnect', 'password'),
-                 ('openconnect-rsa', 'rsa-token'))
+                 ('openconnect-rsa', 'rsa-token'),
+                 ('openconnect-totp', 'totp-token'))
+        display_arr = []
         for kind, display_name in kinds:
             if Popen(['security', 'find-internet-password',
                       '-c', CREATOR, '-l', name, '-D', kind],
                      stdout=devnull, stderr=devnull).wait() == 0:
-                return display_name
+                display_arr.append(display_name)
+        if display_arr:
+            return ",".join(display_arr)
         return 'interactive'
 
     def iter_profiles(self):
@@ -154,6 +167,7 @@ class ProfileManager(object):
         stdin = None
         password = self.get_keychain_password(name)
         rsa_token = self.get_rsa_token(name)
+        totp_seed = self.get_totp_seed(name)
 
         args = ['sudo', 'openconnect']
         if not cert_check:
@@ -173,6 +187,10 @@ class ProfileManager(object):
         elif rsa_token is not None:
             args.append('--token-mode=rsa')
             args.append('--token-secret=%s' % rsa_token)
+
+        if totp_seed is not None:
+            args.append('--token-mode=totp')
+            args.append('--token-secret=%s' % totp_seed)
 
         fingerprint = profile.get('fingerprint')
         if fingerprint is not None:
@@ -239,6 +257,9 @@ def common_profile_params(f):
                      help='Prompts for a password.'),
         click.option('--remove-password', is_flag=True,
                      help='Removes an already set password.'),
+        click.option('--totp-seed', help='The TOTP seed to import.'),
+        click.option('--remove-totp-seed', help='Removes an old TOTP seed.',
+                     is_flag=True),
         click.option('--rsa-token', help='The RSA token to import.  This '
                      'requires stoken to be installed and compiled into '
                      'openconnect.'),
@@ -257,6 +278,8 @@ def update_profile(manager, name, fields):
         password = click.prompt('Password', hide_input=True)
     rsa_token = fields.pop('rsa_token')
     remove_rsa_token = fields.pop('remove_rsa_token')
+    totp_seed = fields.pop('totp_seed')
+    remove_totp_seed = fields.pop('remove_totp_seed')
     manager.set_profile(name, **fields)
     manager.save()
 
@@ -266,6 +289,11 @@ def update_profile(manager, name, fields):
                                       password=password)
     elif remove_password:
         manager.remove_keychain_password(name)
+
+    if totp_seed is not None:
+        manager.import_totp_seed(name, fields['url'], totp_seed)
+    elif remove_totp_seed:
+        manager.remove_totp_seed(name)
 
     if rsa_token is not None:
         manager.import_rsa_token(name, fields['url'], rsa_token)
