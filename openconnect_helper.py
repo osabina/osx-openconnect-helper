@@ -120,7 +120,10 @@ class ProfileManager(object):
         return self.remove_keychain_password(name, kind='openconnect-totp')
 
     def get_totp_seed(self, name):
-        return "base32:{}".format(self.get_keychain_password(name, kind='openconnect-totp'))
+        seed = self.get_keychain_password(name, kind='openconnect-totp')
+        if seed:
+            return "base32:{}".format(seed)
+        return ''
 
     def set_profile(self, name, url, user, group=None, fingerprint=None):
         profiles = self.config.setdefault('profiles', [])
