@@ -123,7 +123,7 @@ class ProfileManager(object):
         seed = self.get_keychain_password(name, kind='openconnect-totp')
         if seed:
             return "base32:{}".format(seed)
-        return ''
+        return None
 
     def set_profile(self, name, url, user, group=None, fingerprint=None):
         profiles = self.config.setdefault('profiles', [])
@@ -194,6 +194,11 @@ class ProfileManager(object):
         if totp_seed is not None:
             args.append('--token-mode=totp')
             args.append('--token-secret=%s' % totp_seed)
+        else:
+            sys.stdout.write("2FA: ")
+            sys.stdout.flush()
+            token = sys.stdin.readline()
+            stdin = "\n".join([stdin, token])
 
         fingerprint = profile.get('fingerprint')
         if fingerprint is not None:
